@@ -372,7 +372,7 @@
     });
 
     // If requested, close the shape.
-    if (closed) pts.push(pts[0]);
+    if (closed && pts[0] !== pts[pts.length - 1]) pts.push(pts[0]);
 
     return pts;
 
