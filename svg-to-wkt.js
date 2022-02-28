@@ -9,11 +9,8 @@
 
 
 (function() {
-
-
   var SVGNS = 'http://www.w3.org/2000/svg';
   var SVGtoWKT = {};
-
 
   /**
    * The number of decimal places computed during curve interpolation when
@@ -23,7 +20,6 @@
    */
   SVGtoWKT.PRECISION = 3;
 
-
   /**
    * The number of points computed during curve interpolation per unit of
    * linear pixel length. For example, if a a path is 10px in length, and
@@ -32,7 +28,6 @@
    * @public
    */
   SVGtoWKT.DENSITY = 1;
-
 
   /**
    * SVG => WKT.
@@ -44,6 +39,113 @@
    */
   SVGtoWKT.convert = function(svg) {
 
+    var xml = __getXml(svg);
+    var els = [];
+
+    // Match `<polygon>` elements.
+    xml.find('polygon').each(function(i, polygon) {
+      els.push(__createWKT(polygon));
+    });
+
+    // Match `<polyline>` elements.
+    xml.find('polyline').each(function(i, polyline) {
+      els.push(__createWKT(polyline));
+    });
+
+    // Match `<line>` elements.
+    xml.find('line').each(function(i, line) {
+      els.push(__createWKT(line));
+    });
+
+    // Match `<rect>` elements.
+    xml.find('rect').each(function(i, rect) {
+      els.push(__createWKT(rect));
+    });
+
+    // Match `<circle>` elements.
+    xml.find('circle').each(function(i, circle) {
+      els.push(__createWKT(circle));
+    });
+
+    // Match `<ellipse>` elements.
+    xml.find('ellipse').each(function(i, ellipse) {
+      els.push(__createWKT(ellipse));
+    });
+
+    // Match `<path>` elements.
+    xml.find('path').each(function(i, path) {
+      els.push(__createWKT(path));
+    });
+
+    var spaces = [];
+
+    xml.find('[id]').each(function(i, element) {
+      const $shape = $(element);
+      spaces.push({
+        id: $shape.attr('id'),
+        title: $shape.attr('title'),
+        space: __createWKT(element)
+      })
+    });
+
+    response = {
+      detail: 'GEOMETRYCOLLECTION(' + els.join(',') + ')',
+      spaces: spaces
+    };
+
+    return JSON.stringify(response);
+  };
+
+  __createWKT = function(element) {
+    const $element = $(element);
+    switch (element.nodeName) {
+      case 'polygon':
+        return SVGtoWKT.polygon($element.attr('points'))
+      case 'polyline':
+        return SVGtoWKT.polyline($element.attr('points'));
+        case 'line':
+        return SVGtoWKT.line(
+          parseFloat($element.attr('x1')),
+          parseFloat($element.attr('y1')),
+          parseFloat($element.attr('x2')),
+          parseFloat($element.attr('y2'))
+        );
+        case 'rect':
+        return SVGtoWKT.rect(
+          parseFloat($element.attr('x')),
+          parseFloat($element.attr('y')),
+          parseFloat($element.attr('width')),
+          parseFloat($element.attr('height'))
+        );
+        case 'circle':
+        return SVGtoWKT.circle(
+          parseFloat($element.attr('cx')),
+          parseFloat($element.attr('cy')),
+          parseFloat($element.attr('r'))
+        );
+        case 'ellipse':
+        return SVGtoWKT.ellipse(
+          parseFloat($element.attr('cx')),
+          parseFloat($element.attr('cy')),
+          parseFloat($element.attr('rx')),
+          parseFloat($element.attr('ry'))
+        );
+        case 'path':
+        return SVGtoWKT.path($element.attr('d'));
+      default:
+        return 'EMPTY';
+    }
+  };
+
+  /**
+   * SVG => WKT.
+   *
+   * @param {String} svg: SVG markup.
+   * @return {JQuery<XMLDocument>}: Generated WKT.
+   *
+   * @public
+   */
+  __getXml = function(svg) {
     // Halt if svg is undefined or empty.
     if (_.isUndefined(svg) || _.isEmpty(svg.trim())) {
       throw new Error('Empty XML.');
@@ -63,64 +165,8 @@
       throw new Error('Invalid XML.');
     }
 
-    // Match `<polygon>` elements.
-    xml.find('polygon').each(function(i, polygon) {
-      els.push(SVGtoWKT.polygon($(polygon).attr('points')));
-    });
-
-    // Match `<polyline>` elements.
-    xml.find('polyline').each(function(i, polyline) {
-      els.push(SVGtoWKT.polyline($(polyline).attr('points')));
-    });
-
-    // Match `<line>` elements.
-    xml.find('line').each(function(i, line) {
-      els.push(SVGtoWKT.line(
-        parseFloat($(line).attr('x1')),
-        parseFloat($(line).attr('y1')),
-        parseFloat($(line).attr('x2')),
-        parseFloat($(line).attr('y2'))
-      ));
-    });
-
-    // Match `<rect>` elements.
-    xml.find('rect').each(function(i, rect) {
-      els.push(SVGtoWKT.rect(
-        parseFloat($(rect).attr('x')),
-        parseFloat($(rect).attr('y')),
-        parseFloat($(rect).attr('width')),
-        parseFloat($(rect).attr('height'))
-      ));
-    });
-
-    // Match `<circle>` elements.
-    xml.find('circle').each(function(i, circle) {
-      els.push(SVGtoWKT.circle(
-        parseFloat($(circle).attr('cx')),
-        parseFloat($(circle).attr('cy')),
-        parseFloat($(circle).attr('r'))
-      ));
-    });
-
-    // Match `<ellipse>` elements.
-    xml.find('ellipse').each(function(i, circle) {
-      els.push(SVGtoWKT.ellipse(
-        parseFloat($(circle).attr('cx')),
-        parseFloat($(circle).attr('cy')),
-        parseFloat($(circle).attr('rx')),
-        parseFloat($(circle).attr('ry'))
-      ));
-    });
-
-    // Match `<path>` elements.
-    xml.find('path').each(function(i, path) {
-      els.push(SVGtoWKT.path($(path).attr('d')));
-    });
-
-    return 'GEOMETRYCOLLECTION(' + els.join(',') + ')';
-
-  };
-
+    return xml;
+  }
 
   /**
    * Construct a WKT line from SVG start/end point coordinates.
@@ -136,7 +182,6 @@
   SVGtoWKT.line = function(x1, y1, x2, y2) {
     return 'LINESTRING('+x1+' '+-y1+','+x2+' '+-y2+')';
   };
-
 
   /**
    * Construct a WKT linestrimg from SVG `points` attribute value.
@@ -155,9 +200,7 @@
     });
 
     return 'LINESTRING(' + pts.join() + ')';
-
   };
-
 
   /**
    * Construct a WKT polygon from SVG `points` attribute value.
@@ -171,7 +214,8 @@
 
     // "1,2 3,4 " => "1 2,3 4"
     var pts = _.map(points.trim().split(' '), function(pt) {
-      pt = pt.split(','); pt[1] = -pt[1];
+      pt = pt.split(',');
+      pt[1] = -pt[1];
       return pt.join(' ');
     });
 
@@ -179,9 +223,7 @@
     pts.push(pts[0]);
 
     return 'POLYGON((' + pts.join() + '))';
-
   };
-
 
   /**
    * Construct a WKT polygon from SVG rectangle origin and dimensions.
@@ -212,9 +254,7 @@
     // TODO: Corner rounding.
 
     return 'POLYGON((' + pts.join() + '))';
-
   };
-
 
   /**
    * Construct a WKT polygon for a circle from origin and radius.
@@ -228,31 +268,19 @@
    */
   SVGtoWKT.circle = function(cx, cy, r) {
 
-    var wkt = 'POLYGON((';
+    var wkt = '(';
     var pts = [];
 
-    // Compute number of points.
-    var circumference = Math.PI * 2 * r;
-    var point_count = Math.round(circumference * SVGtoWKT.DENSITY);
-
-    // Compute angle between points.
-    var interval_angle = 360 / point_count;
-
-    // Genrate the circle.
-    _(point_count).times(function(i) {
-      var angle = (interval_angle * i) * (Math.PI / 180);
+    // Generate the circle.
+    for (var i = 0; i < 5; i++) {
+      var angle = (90 * i) * (Math.PI / 180);
       var x = __round(cx + r * Math.cos(angle));
       var y = __round(cy + r * Math.sin(angle));
-      pts.push(String(x)+' '+String(-y));
-    });
+      pts.push(`${x} ${-y}`);
+    };
 
-    // Close.
-    pts.push(pts[0]);
-
-    return wkt + pts.join() + '))';
-
+    return `CIRCULARSTRING(${pts.join()})`;
   };
-
 
   /**
    * Construct a WKT polygon for an ellipse from origin and radii.
@@ -291,9 +319,7 @@
     pts.push(pts[0]);
 
     return wkt + pts.join() + '))';
-
   };
-
 
   /**
    * Construct a WKT polygon from a SVG path string. Approach from:
@@ -308,7 +334,7 @@
 
     // Try to extract polygon paths closed with 'Z'.
     var polys = _.map(d.trim().match(/[^z|Z]+[z|Z]/g), function(p) {
-      return __pathElement(p.trim()+'z');
+      return __pathElement(p.trim()).getPathData();
     });
 
     // If closed polygon paths exist, construct a `POLYGON`.
@@ -316,21 +342,59 @@
 
       var parts = [];
       _.each(polys, function(poly) {
-        parts.push('(' + __pathPoints(poly, true).join() + ')');
+        var curve = __curveString(poly)
+        if (poly.some(p => p.type == 'A') && poly.some(p => !['M', 'A', 'Z'].includes(p.type))) {
+          curve = `COMPOUNDCURVE(${curve})`;
+        }
+        parts.push(curve);
       });
 
-      return 'POLYGON(' + parts.join() + ')';
-
+      if (polys.some(p => p.some(p2 => p2.type == 'A'))) {
+        return `CURVEPOLYGON(${parts.join()})`;
+      } else {
+        // Prevent < 4 point linear polygon
+        if (polys.some(p => p.length < 5)) {
+          return `LINESTRING EMPTY`;
+        }
+        return `POLYGON(${parts.join()})`;
+      }
     }
 
     // Otherwise, construct a `LINESTRING` from the unclosed path.
     else {
       var line = __pathElement(d);
-      return 'LINESTRING(' + __pathPoints(line).join() + ')';
+      var data = line.getPathData();
+
+      let curveGroups = [];
+
+      for (const command of data) {
+        if (command.type == 'M') {
+          curveGroups.push([command]);
+        } else {
+          curveGroups[curveGroups.length - 1].push(command);
+        }
+      }
+
+      let multiLines = curveGroups.filter(g => !g.some(c => c.type == 'A'));
+      let compoundCurves = curveGroups.filter(g => g.some(c => c.type == 'A'));
+
+      let geometry = [];
+
+      if (multiLines.length > 1) {
+        const lines = multiLines.map(m => __curveString(m)).join();
+        geometry.push(`MULTILINESTRING(${lines})`);
+      }
+      else if (multiLines.length > 0) {
+        geometry.push(`LINESTRING${__curveString(multiLines[0])}`);
+      }
+
+      for (path of compoundCurves) {
+        geometry.push(`COMPOUNDCURVE(${__curveString(path)})`)
+      }
+
+      return geometry.join();
     }
-
   };
-
 
   /**
    * Construct a SVG path element.
@@ -346,19 +410,90 @@
     return path;
   };
 
+  var __curveString = function(curves) {
+    var linePts = [];
+    var geometries = [];
+    var firstPt = null;
+    var lastPt = {x: 0, y: 0};
 
-  /**
+    for (const step of curves) {
+      switch (step.type) {
+        case 'M':
+          // Move pen
+          break;
+        case 'L':
+          if (linePts.length == 0) {
+            linePts.push(lastPt);
+          }
+          linePts.push(__ptFromValues(step.values));
+          break;
+        case 'Z':
+          // Close by returning to start
+          if (firstPt && lastPt && !(firstPt.x == lastPt.x && firstPt.y == lastPt.y)) {
+            linePts.push(firstPt);
+          }
+          continue;
+        case 'A':
+        default:
+          const pathData = `M ${lastPt.x} ${lastPt.y} ${step.type} ${step.values.join(" ")}`;
+          const mockElement = __pathElement(pathData);
+
+          if (step.type === 'A' && step.values[0] == step.values[1]) {
+            if (linePts.length > 0) {
+              geometries.push(__lineString(linePts));
+            }
+            // Circular arc case
+            const length = mockElement.getTotalLength();
+            const midPoint = mockElement.getPointAtLength(length / 2);
+            const endPoint = __ptFromValues(step.values);
+            geometries.push(__circularString(lastPt, midPoint, endPoint));
+          } else {
+            // All other cases, e.g. bezier, quadratic curves
+            const shapePts = __interpolatedPoints(mockElement);
+            linePts = linePts.concat(shapePts);
+          }
+          break;
+      }
+
+      if (step.values.length >= 2) {
+        lastPt = __ptFromValues(step.values);
+      }
+
+      if (!firstPt) {
+        firstPt = lastPt
+      }
+    }
+
+    // At least two points per line
+    if (linePts.length > 1) {
+      geometries.push(__lineString(linePts));
+    }
+
+    // At least one part per multi curve
+    return geometries.length ? geometries.join() : ' EMPTY';
+  }
+
+  var __ptFromValues = function(values) {
+    return new DOMPointReadOnly(values[values.length - 2], values[values.length - 1]);
+  }
+
+  var __lineString = function(points) {
+    return `(${points.map(p => `${p.x} ${-p.y}`).join()})`;
+  }
+
+  var __circularString = function(startPt, midPt, endPt) {
+    return `CIRCULARSTRING(${startPt.x} ${-startPt.y}, ${midPt.x} ${-midPt.y}, ${endPt.x} ${-endPt.y})`;
+  }
+
+ /**
    * Construct a SVG path element.
    *
    * @param {SVGPathElement} path: A <path> element.
-   * @param {Boolean} closed: True if the path should be closed.
-   * @return array: An array of space-delimited coords.
+   * @return array: An array of { x, y } coords.
    *
    * @private
    */
-  var __pathPoints = function(path, closed) {
-
-    closed = closed || false;
+  var __interpolatedPoints = function(path) {
     var pts = [];
 
     // Get number of points.
@@ -366,18 +501,13 @@
     var count = Math.round(length * SVGtoWKT.DENSITY);
 
     // Interpolate points.
-    _(count+1).times(function(i) {
+    _(count + 1).times(function(i) {
       var point = path.getPointAtLength((length * i) / count);
-      pts.push(String(__round(point.x))+' '+String(__round(-point.y)));
+      pts.push({x: __round(point.x), y: __round(point.y)});
     });
 
-    // If requested, close the shape.
-    if (closed) pts.push(pts[0]);
-
     return pts;
-
-  };
-
+  }
 
   /**
    * Round a number to the number of decimal places in `PRECISION`.
@@ -392,8 +522,6 @@
     return Math.round(val * root) / root;
   };
 
-
   this.SVGtoWKT = SVGtoWKT;
-
 
 }.call(this));
