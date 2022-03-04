@@ -328,6 +328,8 @@
     return wkt + pts.join() + '))';
   };
 
+  const arcFix = new RegExp(/(A\s*(?:\d+[\s,]+){7})(\d+)/, 'g');
+
   /**
    * Construct a WKT polygon from a SVG path string. Approach from:
    * http://whaticode.com/2012/02/01/converting-svg-paths-to-polygons/
@@ -338,6 +340,10 @@
    * @public
    */
   SVGtoWKT.path = function(d) {
+
+    if (d.includes('A')) {
+      d = d.replace(arcFix, '$1L$2');
+    }
 
     // Try to extract polygon paths closed with 'Z'.
     var polys = _.map(d.trim().match(/[^z|Z]+[z|Z]/g), function(p) {
@@ -448,6 +454,7 @@
           if (step.type === 'A' && step.values[0] == step.values[1]) {
             if (linePts.length > 0) {
               geometries.push(__lineString(linePts));
+              linePts = [];
             }
             // Circular arc case
             const length = mockElement.getTotalLength();
