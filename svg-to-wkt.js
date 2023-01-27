@@ -42,58 +42,66 @@
     var xml = __getXml(svg);
     var els = [];
 
-    // Match `<polygon>` elements.
-    xml.find('polygon').each(function(i, polygon) {
-      els.push(__createWKT(polygon));
-    });
+    const svgRoot = xml.documentElement;
+    document.adoptNode(svgRoot);
+    document.body.appendChild(svgRoot);
 
-    // Match `<polyline>` elements.
-    xml.find('polyline').each(function(i, polyline) {
-      els.push(__createWKT(polyline));
-    });
-
-    // Match `<line>` elements.
-    xml.find('line').each(function(i, line) {
-      els.push(__createWKT(line));
-    });
-
-    // Match `<rect>` elements.
-    xml.find('rect').each(function(i, rect) {
-      els.push(__createWKT(rect));
-    });
-
-    // Match `<circle>` elements.
-    xml.find('circle').each(function(i, circle) {
-      els.push(__createWKT(circle));
-    });
-
-    // Match `<ellipse>` elements.
-    xml.find('ellipse').each(function(i, ellipse) {
-      els.push(__createWKT(ellipse));
-    });
-
-    // Match `<path>` elements.
-    xml.find('path').each(function(i, path) {
-      els.push(__createWKT(path));
-    });
+    for (const tagName of ['polygon', 'polyline', 'line', 'rect', 'circle', 'ellipse', 'path']) {
+      for (const element of svgRoot.getElementsByTagName(tagName)) {
+        const wkt = __createWKT(element);
+        els.push(wkt);
+      };
+    }
 
     var spaces = [];
+    var strings = [];
 
-    xml.find('[id]').each(function(i, element) {
+    for (const element of svgRoot.querySelectorAll('[id]')) {
       const $shape = $(element);
       spaces.push({
         id: $shape.attr('id'),
         title: $shape.attr('title'),
         space: __createWKT(element)
       })
-    });
+    };
+
+    for (const element of svgRoot.getElementsByTagName('text')) {
+      const textData = __getText(element, svgRoot);
+      if (textData) {
+        strings.push(textData);
+      }
+    };
 
     response = {
       detail: 'GEOMETRYCOLLECTION(' + els.join(',') + ')',
-      spaces: spaces
+      spaces,
+      strings
     };
 
     return JSON.stringify(response);
+  };
+
+  __getText = function(element, svg) {
+    const len = element.getNumberOfChars();
+    if (len == 0) return null;
+
+    var rootCtm = svg.getCTM().inverse();
+
+    const matrix = element.getCTM();
+    var start = element.getStartPositionOfChar(0).matrixTransform(matrix).matrixTransform(rootCtm);
+    var end = element.getEndPositionOfChar(len - 1).matrixTransform(matrix).matrixTransform(rootCtm);
+
+    const size = element.getAttribute('font-size');
+    const font = element.getAttribute('font-family');
+
+    var textData = {
+      text: element.textContent,
+      path: `LINESTRING(${start.x} ${-start.y}, ${end.x} ${-end.y})`,
+      ...(size && { fontSize: size}),
+      ...(font && { fontFamily: font})
+    }
+
+    return textData;
   };
 
   __createWKT = function(element) {
@@ -141,7 +149,7 @@
    * SVG => WKT.
    *
    * @param {String} svg: SVG markup.
-   * @return {JQuery<XMLDocument>}: Generated WKT.
+   * @return {XMLDocument}: parsed SVG document.
    *
    * @public
    */
@@ -151,7 +159,6 @@
       throw new Error('Empty XML.');
     }
 
-    var els = [];
     var xml;
 
     // Strip out tabs and linebreaks.
@@ -159,7 +166,7 @@
 
     try {
       // Parse the raw XML.
-      xml = $($.parseXML(svg));
+      xml = new DOMParser().parseFromString(svg, "image/svg+xml");
     } catch (e) {
       // Halt if malformed.
       throw new Error('Invalid XML.');
@@ -321,6 +328,8 @@
     return wkt + pts.join() + '))';
   };
 
+  const arcFix = new RegExp(/(A\s*(?:\d+[\s,]+){7})(\d+)/, 'g');
+
   /**
    * Construct a WKT polygon from a SVG path string. Approach from:
    * http://whaticode.com/2012/02/01/converting-svg-paths-to-polygons/
@@ -331,6 +340,10 @@
    * @public
    */
   SVGtoWKT.path = function(d) {
+
+    if (d.includes('A')) {
+      d = d.replace(arcFix, '$1L$2');
+    }
 
     // Try to extract polygon paths closed with 'Z'.
     var polys = _.map(d.trim().match(/[^z|Z]+[z|Z]/g), function(p) {
@@ -441,6 +454,7 @@
           if (step.type === 'A' && step.values[0] == step.values[1]) {
             if (linePts.length > 0) {
               geometries.push(__lineString(linePts));
+              linePts = [];
             }
             // Circular arc case
             const length = mockElement.getTotalLength();
